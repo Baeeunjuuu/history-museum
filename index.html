@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3D 역사 테마 박물관</title>
+  <style>
+    :root {
+      --indigo: #4338ca;
+      --indigo-dark: #312e81;
+      --green: #16a34a;
+      --red: #dc2626;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #d8e0ea;
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      font-family: "Malgun Gothic", "Noto Sans KR", Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--bg); }
+    button, input, textarea, select { font: inherit; }
+    button { border: 0; cursor: pointer; }
+    .topbar {
+      min-height: 48px; background: var(--indigo); color: white;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 0 14px; box-shadow: 0 2px 10px rgba(15, 23, 42, .22);
+      position: sticky; top: 0; z-index: 20;
+    }
+    .brand { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 900; white-space: nowrap; }
+    .nav { display: flex; align-items: center; gap: 6px; overflow-x: auto; }
+    .nav button {
+      color: white; background: transparent; padding: 9px 12px; border-radius: 6px;
+      display: flex; align-items: center; gap: 7px; white-space: nowrap; font-weight: 800;
+    }
+    .nav button.active { background: var(--indigo-dark); }
+    .view { width: min(1160px, calc(100vw - 28px)); margin: 22px auto 38px; }
+    .notice {
+      width: min(1160px, calc(100vw - 28px)); margin: 12px auto 0; padding: 10px 12px;
+      border: 1px solid #fde68a; background: #fffbeb; color: #78350f; border-radius: 6px;
+      font-size: 13px; font-weight: 800; display: none;
+    }
+    .notice.show { display: block; }
+    .grid-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 8px rgba(15, 23, 42, .05); }
+    .era-card { padding: 18px; }
+    .era-title { margin: 0 0 12px; color: #1e1b8f; font-size: 18px; font-weight: 900; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+    label { display: block; font-size: 13px; font-weight: 900; margin: 10px 0 6px; }
+    input, textarea, select {
+      width: 100%; border: 1px solid #c8d3e2; border-radius: 4px; background: white;
+      color: var(--ink); padding: 9px 10px; min-height: 34px;
+    }
+    input[type="color"] { padding: 4px; height: 34px; }
+    textarea { min-height: 56px; resize: vertical; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+    .span-2 { grid-column: span 2; }
+    .primary {
+      width: 100%; margin-top: 14px; background: #4f46e5; color: white;
+      border-radius: 4px; padding: 11px 14px; font-weight: 900;
+    }
+    .success { background: var(--green); }
+    .danger { background: var(--red); color: white; border-radius: 4px; padding: 8px 10px; font-weight: 900; }
+    .secondary { background: #e2e8f0; color: #0f172a; border-radius: 4px; padding: 9px 12px; font-weight: 900; }
+    .split { display: grid; grid-template-columns: 260px 1fr; gap: 24px; align-items: start; }
+    .side-form, .list-panel, .fund-form, .teacher-panel { padding: 18px; }
+    .side-form h2, .list-panel h2, .fund-form h2, .teacher-panel h1, .teacher-panel h2 {
+      margin: 0 0 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .quiz-box { margin-top: 18px; padding: 13px; background: #eef2ff; border: 1px solid #dbe4ff; border-radius: 6px; }
+    .ox { display: flex; gap: 12px; margin-top: 8px; font-size: 13px; font-weight: 800; }
+    .era-list { margin-top: 20px; border-bottom: 1px solid #e8eef5; padding-bottom: 16px; }
+    .era-chip { display: inline-block; background: #edf1f7; padding: 5px 10px; border-radius: 2px; font-size: 17px; font-weight: 900; }
+    .empty { color: #8190a5; font-style: italic; margin: 9px 0 0 12px; font-size: 14px; }
+    .artifact-row {
+      margin: 10px 0 0 12px; padding: 10px; border: 1px solid #e4ebf3; border-radius: 6px;
+      background: #fbfdff; display: grid; grid-template-columns: 54px 1fr; gap: 10px; align-items: center;
+    }
+    .artifact-row img { width: 54px; height: 54px; object-fit: cover; border-radius: 4px; background: #e2e8f0; }
+    .theme-line { color: #4f46e5; font-weight: 800; font-size: 14px; }
+    .museum-view { width: 100%; margin: 0; height: calc(100vh - 48px); position: relative; overflow: hidden; background: #050816; }
+    #museumCanvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 50%; transform: translateX(-50%); background: rgba(2, 6, 23, .72);
+      color: white; backdrop-filter: blur(10px); border-radius: 999px; padding: 10px 16px;
+      display: flex; gap: 18px; align-items: center; font-size: 13px; pointer-events: none;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .25); white-space: nowrap;
+    }
+    .hud.top { top: 18px; }
+    .hud.bottom { bottom: 22px; background: rgba(67, 56, 202, .86); }
+    .key { color: #fde047; font-weight: 900; }
+    .modal-backdrop {
+      position: fixed; inset: 48px 0 0; background: rgba(2, 6, 23, .78); z-index: 40;
+      display: none; align-items: center; justify-content: center; padding: 22px;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal { width: min(940px, 96vw); max-height: calc(100vh - 96px); background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 25px 80px rgba(0,0,0,.32); position: relative; }
+    .close { position: absolute; right: 12px; top: 12px; width: 36px; height: 36px; border-radius: 999px; background: rgba(15,23,42,.72); color: white; z-index: 2; font-size: 22px; }
+    .artifact-modal { display: grid; grid-template-columns: 1fr 1fr; min-height: 520px; }
+    .modal-media { background: #111827; display: flex; align-items: center; justify-content: center; padding: 28px; }
+    .modal-media img { max-width: 100%; max-height: 460px; object-fit: contain; border-radius: 6px; }
+    .modal-body { padding: 34px; overflow: auto; background: #f8fafc; }
+    .modal-body h2 { margin: 0 0 8px; color: #1e1b8f; font-size: 30px; }
+    .description { background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 18px; line-height: 1.65; white-space: pre-wrap; min-height: 130px; }
+    .quiz-panel { margin-top: 18px; background: #e0e7ff; border: 1px solid #c7d2fe; border-radius: 6px; padding: 16px; }
+    .quiz-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .quiz-actions button { color: white; font-size: 24px; font-weight: 900; padding: 10px; border-radius: 6px; }
+    .funding-layout { display: grid; grid-template-columns: 1fr 255px; gap: 24px; align-items: start; }
+    .funding-title { margin: 0 0 16px; font-size: 27px; display: flex; gap: 10px; align-items: center; }
+    .fund-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .fund-card { padding: 20px; min-height: 136px; position: relative; }
+    .fund-card.winner { background: #fffde8; border-color: #facc15; }
+    .badge { position: absolute; right: -10px; top: -10px; background: #facc15; color: #422006; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 900; }
+    .fund-card h3 { margin: 0 0 8px; font-size: 18px; }
+    .amount { text-align: right; font-size: 28px; font-weight: 950; margin-top: 18px; }
+    .progress { width: 100%; height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+    .progress span { display: block; height: 100%; width: 0; background: #6366f1; }
+    .budget-status { margin-top: 8px; padding: 10px; border-radius: 6px; background: #eef2ff; color: #312e81; font-size: 13px; font-weight: 800; line-height: 1.5; }
+    .investor-list { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+    .investor-item { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; font-size: 13px; }
+    .teacher-layout { display: grid; grid-template-columns: 320px 1fr; gap: 22px; align-items: start; }
+    .management-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .management-table th, .management-table td { border-bottom: 1px solid #e2e8f0; padding: 10px 8px; text-align: left; vertical-align: top; }
+    .management-table th { background: #f1f5f9; font-weight: 900; }
+    .toast { position: fixed; right: 18px; bottom: 18px; background: #0f172a; color: white; padding: 12px 16px; border-radius: 6px; box-shadow: 0 14px 30px rgba(15,23,42,.25); opacity: 0; transform: translateY(14px); pointer-events: none; transition: .2s; z-index: 60; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    @media (max-width: 820px) {
+      .topbar { align-items: flex-start; flex-direction: column; gap: 8px; padding: 10px 12px; }
+      .nav { width: 100%; }
+      .grid-two, .split, .teacher-layout, .funding-layout, .fund-grid, .artifact-modal { grid-template-columns: 1fr; }
+      .museum-view { height: calc(100vh - 95px); }
+      .hud { width: calc(100vw - 26px); justify-content: center; flex-wrap: wrap; border-radius: 8px; gap: 8px 14px; white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">🎨 3D 역사 테마 박물관</div>
+      <nav class="nav" aria-label="주요 화면">
+        <button class="active" data-tab="setup">⚙ 기획/설정</button>
+        <button data-tab="register">🖼 유물 등록</button>
+        <button data-tab="museum">🗺 3D 전시관</button>
+        <button data-tab="funding">💵 전시 펀딩</button>
+        <button data-tab="manage">🔐 유물 관리</button>
+      </nav>
+    </header>
+    <div id="firebaseNotice" class="notice"></div>
+    <main id="setupView" class="view"></main>
+    <main id="registerView" class="view" hidden></main>
+    <main id="museumView" class="museum-view" hidden>
+      <canvas id="museumCanvas"></canvas>
+      <div class="hud top"><span><b class="key">W,A,S,D</b> 이동</span><span>마우스 드래그 회전</span><span>스크롤 확대/축소</span></div>
+      <div class="hud bottom">마음에 드는 테마 간판이나 유물 액자를 클릭하면 자세히 볼 수 있습니다.</div>
+    </main>
+    <main id="fundingView" class="view" hidden></main>
+    <main id="manageView" class="view" hidden></main>
+  </div>
+  <div id="modalBackdrop" class="modal-backdrop"></div>
+  <div id="toast" class="toast"></div>
+
+  <script type="module">
+    // Firebase 콘솔 > 프로젝트 설정 > 내 앱 > SDK 설정 및 구성의 firebaseConfig 값을 붙여 넣으세요.
+    const FIREBASE_CONFIG = {
+      apiKey: "여기에_apiKey",
+      authDomain: "여기에_authDomain",
+      projectId: "여기에_projectId",
+      storageBucket: "여기에_storageBucket",
+      messagingSenderId: "여기에_messagingSenderId",
+      appId: "여기에_appId"
+    };
+
+    const ERAS = ["삼국시대 1", "삼국시대 2", "고려시대 1", "고려시대 2", "조선시대 1"];
+    const DEFAULT_COLORS = ["#ffecd2", "#d4fc79", "#e0c3fc", "#dbeafe", "#fdfbfb"];
+    const DEFAULT_FLOORS = ["#333333", "#444444", "#555555", "#475569", "#666666"];
+    const INVESTOR_BUDGET = 100000;
+    const FIRESTORE_PATH = ["historyMuseumApps", "mainClassroom"];
+    const DEFAULT_STATE = {
+      themes: Object.fromEntries(ERAS.map((era, index) => [era, {
+        theme: "", reason: "", color: DEFAULT_COLORS[index], texture: "plain",
+        floorColor: DEFAULT_FLOORS[index], lighting: "normal"
+      }])),
+      artifacts: [],
+      fundings: [],
+      teacherPassword: ""
+    };
+
+    let THREE = null;
+    let db = null;
+    let sharedDocRef = null;
+    let firebaseReady = false;
+    let remoteLoaded = false;
+    let sceneHandle = null;
+    let currentTab = "setup";
+    let teacherLoggedIn = false;
+    let state = loadLocalState();
+
+    function hasFirebaseConfig() {
+      return FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.includes("여기에");
+    }
+
+    async function ensureThree() {
+      if (THREE) return THREE;
+      THREE = await import("https://unpkg.com/three@0.164.1/build/three.module.js");
+      return THREE;
+    }
+
+    async function initFirebase() {
+      const notice = document.getElementById("firebaseNotice");
+      if (!hasFirebaseConfig()) {
+        notice.textContent = "현재 Firebase 설정값이 없어 이 브라우저에만 저장됩니다. 학생 공동 사용 전 firebaseConfig를 입력하세요.";
+        notice.classList.add("show");
+        return;
+      }
+      try {
+        const appMod = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+        const fsMod = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const app = appMod.initializeApp(FIREBASE_CONFIG);
+        db = fsMod.getFirestore(app);
+        sharedDocRef = fsMod.doc(db, ...FIRESTORE_PATH);
+        firebaseReady = true;
+        firebaseApi = fsMod;
+        notice.textContent = "Firebase 실시간 공유 저장소에 연결되었습니다.";
+        notice.classList.add("show");
+        fsMod.onSnapshot(sharedDocRef, async (snapshot) => {
+          if (!snapshot.exists()) {
+            await saveState();
+            return;
+          }
+          state = mergeState(snapshot.data());
+          remoteLoaded = true;
+          saveLocalState();
+          render();
+        }, (error) => {
+          console.error(error);
+          notice.textContent = "Firebase 연결 오류가 있습니다. Firestore 규칙과 설정값을 확인하세요.";
+          notice.classList.add("show");
+        });
+      } catch (error) {
+        console.error(error);
+        notice.textContent = "Firebase SDK를 불러오지 못했습니다. 인터넷 연결 또는 설정값을 확인하세요.";
+        notice.classList.add("show");
+      }
+    }
+
+    function loadLocalState() {
+      try {
+        return mergeState(JSON.parse(localStorage.getItem("historyMuseumFundingApp") || "{}"));
+      } catch {
+        return structuredClone(DEFAULT_STATE);
+      }
+    }
+
+    function mergeState(data) {
+      return {
+        themes: { ...structuredClone(DEFAULT_STATE).themes, ...(data.themes || {}) },
+        artifacts: Array.isArray(data.artifacts) ? data.artifacts : [],
+        fundings: Array.isArray(data.fundings) ? data.fundings : [],
+        teacherPassword: data.teacherPassword || ""
+      };
+    }
+
+    function saveLocalState() {
+      localStorage.setItem("historyMuseumFundingApp", JSON.stringify(state));
+    }
+
+    async function saveState() {
+      saveLocalState();
+      if (firebaseReady && sharedDocRef) {
+        await firebaseApi.setDoc(sharedDocRef, {
+          ...state,
+          updatedAt: Date.now()
+        }, { merge: true });
+      }
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    document.querySelectorAll(".nav button").forEach((button) => {
+      button.addEventListener("click", () => switchTab(button.dataset.tab));
+    });
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll(".nav button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.tab === tab);
+      });
+      ["setup", "register", "museum", "funding", "manage"].forEach((name) => {
+        document.getElementById(`${name}View`).hidden = name !== tab;
+      });
+      if (sceneHandle) {
+        sceneHandle.dispose();
+        sceneHandle = null;
+      }
+      if (tab === "museum") {
+        createMuseumScene().then((handle) => {
+          if (currentTab === "museum") sceneHandle = handle;
+        }).catch((error) => {
+          console.error(error);
+          showToast("3D 전시관을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.");
+        });
+      } else {
+        render();
+      }
+    }
+
+    function render() {
+      renderSetup();
+      renderRegister();
+      renderFunding();
+      renderManage();
+    }
+
+    function renderSetup() {
+      const root = document.getElementById("setupView");
+      root.innerHTML = `<div class="grid-two">${ERAS.map((era) => {
+        const t = state.themes[era];
+        return `
+          <section class="card era-card">
+            <h2 class="era-title">${era}</h2>
+            <form data-theme-era="${era}">
+              <div class="form-grid">
+                <div class="span-2">
+                  <label>전시 테마 (주제)</label>
+                  <input name="theme" value="${escapeHtml(t.theme)}" placeholder="예: 서민들의 생생한 삶" required>
+                </div>
+                <div class="span-2">
+                  <label>테마 선정 이유</label>
+                  <textarea name="reason" placeholder="우리 모둠이 이 테마를 선택한 이유를 관람객에게 설명해주세요." required>${escapeHtml(t.reason)}</textarea>
+                </div>
+                <div>
+                  <label>벽면 색상</label>
+                  <input type="color" name="color" value="${t.color}">
+                </div>
+                <div>
+                  <label>벽면 재질</label>
+                  <select name="texture">${option("plain", "일반 페인트", t.texture)}${option("wood", "목재 패널", t.texture)}${option("stone", "석재 벽면", t.texture)}</select>
+                </div>
+                <div>
+                  <label>바닥 색상</label>
+                  <input type="color" name="floorColor" value="${t.floorColor}">
+                </div>
+                <div>
+                  <label>조명 분위기</label>
+                  <select name="lighting">${option("normal", "일반 조명 (밝음)", t.lighting)}${option("warm", "따뜻한 조명", t.lighting)}${option("dramatic", "집중 조명", t.lighting)}</select>
+                </div>
+              </div>
+              <button class="primary" type="submit">인테리어 저장 및 3D 적용</button>
+            </form>
+          </section>
+        `;
+      }).join("")}</div>`;
+      root.querySelectorAll("form[data-theme-era]").forEach((form) => {
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const data = new FormData(form);
+          state.themes[form.dataset.themeEra] = {
+            theme: data.get("theme").trim(),
+            reason: data.get("reason").trim(),
+            color: data.get("color"),
+            texture: data.get("texture"),
+            floorColor: data.get("floorColor"),
+            lighting: data.get("lighting")
+          };
+          await saveState();
+          showToast(`${form.dataset.themeEra} 전시 기획이 저장되었습니다.`);
+          render();
+        });
+      });
+    }
+
+    function renderRegister() {
+      const root = document.getElementById("registerView");
+      root.innerHTML = `
+        <div class="split">
+          <section class="card side-form">
+            <h2>🖼 유물 및 작품 등록</h2>
+            <form id="artifactForm">
+              <label>담당 시대</label>
+              <select name="era" required><option value="">시대를 선택하세요</option>${ERAS.map((era) => `<option>${era}</option>`).join("")}</select>
+              <label>조사자 (학생 이름)</label>
+              <input name="studentName" placeholder="예: 홍길동" required>
+              <label>유물/작품 이름</label>
+              <input name="artifactName" placeholder="예: 백제 금동대향로" required>
+              <label>유물 이미지 업로드</label>
+              <input type="file" name="image" accept="image/*">
+              <label>유물 설명 및 조사 내용 (표 작성)</label>
+              <textarea name="description" rows="8" placeholder="문화재 이름&#10;&#10;건립시기/제작자&#10;&#10;배경 및 특징&#10;&#10;문화재의 가치" required></textarea>
+              <div class="quiz-box">
+                <label>관람객 O/X 퀴즈 출제</label>
+                <input name="quizQuestion" placeholder="예: 이 유물은 고려시대에 만들어졌다.">
+                <div class="ox">
+                  <label><input type="radio" name="quizAnswer" value="O" checked> O (맞음)</label>
+                  <label><input type="radio" name="quizAnswer" value="X"> X (틀림)</label>
+                </div>
+              </div>
+              <button class="primary success" type="submit">박물관에 전시하기</button>
+            </form>
+          </section>
+          <section class="card list-panel">
+            <h2>현재 전시된 유물 목록</h2>
+            ${ERAS.map((era) => renderEraArtifacts(era)).join("")}
+          </section>
+        </div>
+      `;
+      document.getElementById("artifactForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const data = new FormData(form);
+        const file = data.get("image");
+        const image = file && file.size ? await readFileAsDataUrl(file) : "";
+        state.artifacts.push({
+          id: crypto.randomUUID(),
+          era: data.get("era"),
+          studentName: data.get("studentName").trim(),
+          artifactName: data.get("artifactName").trim(),
+          description: data.get("description").trim(),
+          image,
+          quizQuestion: data.get("quizQuestion").trim(),
+          quizAnswer: data.get("quizAnswer"),
+          timestamp: Date.now()
+        });
+        await saveState();
+        form.reset();
+        showToast("유물이 박물관에 전시되었습니다.");
+        render();
+      });
+    }
+
+    function renderEraArtifacts(era) {
+      const items = state.artifacts.filter((artifact) => artifact.era === era);
+      return `
+        <div class="era-list">
+          <span class="era-chip">${era} (총 ${items.length}개)</span>
+          ${items.length ? items.map((artifact) => `
+            <div class="artifact-row">
+              ${artifact.image ? `<img src="${artifact.image}" alt="">` : `<img alt="">`}
+              <div><b>${escapeHtml(artifact.artifactName)}</b><br><span class="theme-line">조사자: ${escapeHtml(artifact.studentName)}</span></div>
+            </div>
+          `).join("") : `<p class="empty">아직 등록된 유물이 없습니다.</p>`}
+        </div>
+      `;
+    }
+
+    function renderFunding() {
+      const root = document.getElementById("fundingView");
+      const totals = Object.fromEntries(ERAS.map((era) => [era, totalFunding(era)]));
+      const max = Math.max(1, ...Object.values(totals));
+      const winner = ERAS.find((era) => totals[era] === Math.max(...Object.values(totals)) && totals[era] > 0);
+      const investors = getInvestorSummaries();
+      root.innerHTML = `
+        <div class="funding-layout">
+          <section>
+            <h1 class="funding-title">💵 테마 전시 펀딩 결과</h1>
+            <div class="fund-grid">
+              ${ERAS.map((era) => {
+                const total = totals[era];
+                const theme = state.themes[era].theme || "미정";
+                return `
+                  <article class="card fund-card ${winner === era ? "winner" : ""}">
+                    ${winner === era ? `<div class="badge">1위! 최고 투자액</div>` : ""}
+                    <h3>${era}</h3>
+                    <div class="theme-line">테마: ${escapeHtml(theme)}</div>
+                    <p style="font-size:13px;color:#64748b;margin-top:24px;">총 펀딩 누적액</p>
+                    <div class="amount">${total.toLocaleString("ko-KR")}원</div>
+                    <div class="progress"><span style="width:${Math.max(4, total / max * 100)}%"></span></div>
+                  </article>
+                `;
+              }).join("")}
+            </div>
+          </section>
+          <aside class="card fund-form">
+            <h2>투자하기 (1인 10만원)</h2>
+            <form id="fundingForm">
+              <label>투자자 이름</label>
+              <input id="donorNameInput" name="donorName" placeholder="예: 김학생" required>
+              <div id="budgetStatus" class="budget-status">이름을 입력하면 남은 투자 가능 금액이 표시됩니다.</div>
+              <label>투자할 전시 시대</label>
+              <select name="era" required><option value="">시대를 선택하세요</option>${ERAS.map((era) => `<option>${era}</option>`).join("")}</select>
+              <label>투자 금액 (원)</label>
+              <input type="number" name="amount" min="1000" max="${INVESTOR_BUDGET}" step="1000" placeholder="예: 50000" required>
+              <button class="primary" style="background:#37308b;margin-top:24px;" type="submit">펀딩 후원하기</button>
+            </form>
+            <div class="investor-list">
+              <b>투자자별 사용 현황</b>
+              ${investors.length ? investors.map((investor) => `
+                <div class="investor-item"><span>${escapeHtml(investor.name)}</span><b>${investor.used.toLocaleString("ko-KR")}원 / ${INVESTOR_BUDGET.toLocaleString("ko-KR")}원</b></div>
+              `).join("") : `<p class="empty" style="margin-left:0;">아직 투자 내역이 없습니다.</p>`}
+            </div>
+          </aside>
+        </div>
+      `;
+      const donorInput = document.getElementById("donorNameInput");
+      const budgetStatus = document.getElementById("budgetStatus");
+      donorInput.addEventListener("input", () => {
+        const name = normalizeName(donorInput.value);
+        if (!name) {
+          budgetStatus.textContent = "이름을 입력하면 남은 투자 가능 금액이 표시됩니다.";
+          return;
+        }
+        const used = donorUsed(name);
+        const remaining = Math.max(0, INVESTOR_BUDGET - used);
+        budgetStatus.textContent = `${name}님의 사용 금액: ${used.toLocaleString("ko-KR")}원 / 남은 금액: ${remaining.toLocaleString("ko-KR")}원`;
+      });
+      document.getElementById("fundingForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const data = new FormData(form);
+        const donorName = normalizeName(data.get("donorName"));
+        const amount = Number(data.get("amount"));
+        const used = donorUsed(donorName);
+        if (used + amount > INVESTOR_BUDGET) {
+          const remaining = Math.max(0, INVESTOR_BUDGET - used);
+          showToast(`남은 투자 가능 금액은 ${remaining.toLocaleString("ko-KR")}원입니다.`);
+          return;
+        }
+        state.fundings.push({ id: crypto.randomUUID(), era: data.get("era"), donorName, amount, timestamp: Date.now() });
+        await saveState();
+        showToast("펀딩이 완료되었습니다.");
+        form.reset();
+        render();
+      });
+    }
+
+    function renderManage() {
+      const root = document.getElementById("manageView");
+      if (!state.teacherPassword) {
+        root.innerHTML = `
+          <section class="card teacher-panel" style="max-width:460px;">
+            <h1>🔐 교사용 유물 관리 비밀번호 설정</h1>
+            <p class="theme-line">처음 한 번만 관리 비밀번호를 정해주세요.</p>
+            <form id="setTeacherPasswordForm">
+              <label>새 비밀번호</label><input type="password" name="password" minlength="4" required>
+              <label>비밀번호 확인</label><input type="password" name="passwordConfirm" minlength="4" required>
+              <button class="primary" type="submit">비밀번호 저장</button>
+            </form>
+          </section>
+        `;
+        document.getElementById("setTeacherPasswordForm").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          if (String(data.get("password")) !== String(data.get("passwordConfirm"))) {
+            showToast("비밀번호 확인이 일치하지 않습니다.");
+            return;
+          }
+          state.teacherPassword = String(data.get("password"));
+          teacherLoggedIn = true;
+          await saveState();
+          showToast("교사용 비밀번호가 저장되었습니다.");
+          renderManage();
+        });
+        return;
+      }
+      if (!teacherLoggedIn) {
+        root.innerHTML = `
+          <section class="card teacher-panel" style="max-width:420px;">
+            <h1>🔐 교사용 유물 관리</h1>
+            <p class="theme-line">비밀번호를 입력하면 학생별 유물 등록 현황과 삭제 기능이 보입니다.</p>
+            <form id="teacherLoginForm">
+              <label>관리 비밀번호</label><input type="password" name="password" required>
+              <button class="primary" type="submit">관리 화면 열기</button>
+            </form>
+          </section>
+        `;
+        document.getElementById("teacherLoginForm").addEventListener("submit", (event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          if (String(data.get("password")) !== state.teacherPassword) {
+            showToast("비밀번호가 맞지 않습니다.");
+            return;
+          }
+          teacherLoggedIn = true;
+          renderManage();
+        });
+        return;
+      }
+      root.innerHTML = `
+        <div class="teacher-layout">
+          <section class="card teacher-panel">
+            <h1>🔐 교사용 관리</h1>
+            <p class="theme-line">총 등록 유물: ${state.artifacts.length}개</p>
+            <button id="teacherLogout" class="secondary" type="button">관리 화면 잠그기</button>
+            <button id="resetTeacherPassword" class="secondary" type="button" style="margin-top:8px;">비밀번호 다시 설정</button>
+          </section>
+          <section class="card teacher-panel">
+            <h2>학생별 유물 등록 현황</h2>
+            ${state.artifacts.length ? `
+              <table class="management-table">
+                <thead><tr><th>학생</th><th>시대</th><th>유물/작품</th><th>등록 시간</th><th>관리</th></tr></thead>
+                <tbody>${state.artifacts.slice().sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0)).map((artifact) => `
+                  <tr>
+                    <td>${escapeHtml(artifact.studentName || "이름 없음")}</td>
+                    <td>${escapeHtml(artifact.era || "-")}</td>
+                    <td><b>${escapeHtml(artifact.artifactName || "제목 없음")}</b><br><span class="theme-line">${escapeHtml((artifact.description || "").slice(0, 80))}</span></td>
+                    <td>${formatDate(artifact.timestamp)}</td>
+                    <td><button class="danger" data-delete-artifact="${artifact.id}" type="button">삭제</button></td>
+                  </tr>`).join("")}</tbody>
+              </table>` : `<p class="empty" style="margin-left:0;">아직 등록된 유물이 없습니다.</p>`}
+          </section>
+        </div>
+      `;
+      document.getElementById("teacherLogout").addEventListener("click", () => {
+        teacherLoggedIn = false;
+        renderManage();
+      });
+      document.getElementById("resetTeacherPassword").addEventListener("click", async () => {
+        if (!confirm("교사용 비밀번호를 다시 설정하시겠습니까? 다시 설정 전까지 관리 화면은 잠깁니다.")) return;
+        state.teacherPassword = "";
+        teacherLoggedIn = false;
+        await saveState();
+        renderManage();
+      });
+      root.querySelectorAll("[data-delete-artifact]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const artifact = state.artifacts.find((item) => item.id === button.dataset.deleteArtifact);
+          if (!artifact) return;
+          if (!confirm(`${artifact.studentName} 학생의 '${artifact.artifactName}' 등록을 삭제할까요?`)) return;
+          state.artifacts = state.artifacts.filter((item) => item.id !== artifact.id);
+          await saveState();
+          showToast("유물 등록이 삭제되었습니다.");
+          render();
+        });
+      });
+    }
+
+    function totalFunding(era) {
+      return state.fundings.filter((funding) => funding.era === era).reduce((sum, funding) => sum + Number(funding.amount || 0), 0);
+    }
+    function donorUsed(name) {
+      const target = normalizeName(name);
+      return state.fundings.filter((funding) => normalizeName(funding.donorName) === target).reduce((sum, funding) => sum + Number(funding.amount || 0), 0);
+    }
+    function getInvestorSummaries() {
+      const map = new Map();
+      state.fundings.forEach((funding) => {
+        const name = normalizeName(funding.donorName);
+        if (!name) return;
+        map.set(name, (map.get(name) || 0) + Number(funding.amount || 0));
+      });
+      return Array.from(map, ([name, used]) => ({ name, used })).sort((a, b) => b.used - a.used);
+    }
+    function normalizeName(name) { return String(name || "").trim().replace(/\s+/g, " "); }
+    function formatDate(timestamp) {
+      if (!timestamp) return "-";
+      return new Date(timestamp).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+    }
+
+    async function createMuseumScene() {
+      await ensureThree();
+      const canvas = document.getElementById("museumCanvas");
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color("#07111f");
+      const camera = new THREE.PerspectiveCamera(68, 1, .1, 1000);
+      camera.position.set(0, 5, 35);
+      camera.lookAt(0, 5, 0);
+      scene.add(new THREE.AmbientLight("#ffffff", .55));
+      const spot = new THREE.SpotLight("#fff7df", 1.5, 120, Math.PI / 5, .35);
+      spot.position.set(0, 42, 0);
+      scene.add(spot);
+      const interactables = [];
+      const roomRadius = 32;
+      const wallDefs = ERAS.map((era, index) => {
+        const angle = -Math.PI / 2 + index * (Math.PI * 2 / ERAS.length);
+        return {
+          era,
+          pos: [Math.cos(angle) * roomRadius, 8, Math.sin(angle) * roomRadius],
+          size: [32, 16],
+          rot: [0, -angle - Math.PI / 2, 0],
+          normal: [Math.cos(angle), 0, Math.sin(angle)],
+          tangent: [-Math.sin(angle), 0, Math.cos(angle)]
+        };
+      });
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(roomRadius * 2, roomRadius * 2), new THREE.MeshStandardMaterial({ color: "#22252d", roughness: .8 }));
+      floor.rotation.x = -Math.PI / 2;
+      scene.add(floor);
+      wallDefs.forEach((def) => {
+        const theme = state.themes[def.era];
+        const wall = new THREE.Mesh(new THREE.PlaneGeometry(def.size[0], def.size[1]), new THREE.MeshStandardMaterial({ color: theme.color, roughness: .65, side: THREE.DoubleSide }));
+        wall.position.set(...def.pos);
+        wall.rotation.set(...def.rot);
+        scene.add(wall);
+        const sign = makeTextPanel(def.era, theme.theme || "테마 미정", "테마 선정 이유 보기");
+        sign.position.set(def.pos[0] - def.normal[0] * .55, 13.8, def.pos[2] - def.normal[2] * .55);
+        sign.rotation.set(...def.rot);
+        sign.userData = { type: "theme", era: def.era };
+        scene.add(sign);
+        interactables.push(sign);
+        state.artifacts.filter((artifact) => artifact.era === def.era).slice(0, 5).forEach((artifact, index) => {
+          const xOffset = (index - 2) * 6.2;
+          const frame = makeArtifactPanel(artifact);
+          frame.position.set(def.pos[0] + def.tangent[0] * xOffset - def.normal[0] * .65, 7.2, def.pos[2] + def.tangent[2] * xOffset - def.normal[2] * .65);
+          frame.rotation.set(...def.rot);
+          frame.userData = { type: "artifact", id: artifact.id };
+          scene.add(frame);
+          interactables.push(frame);
+        });
+      });
+      const keys = {};
+      let dragging = false;
+      let prev = { x: 0, y: 0 };
+      let clickStart = { x: 0, y: 0 };
+      const raycaster = new THREE.Raycaster();
+      const pointer = new THREE.Vector2();
+      const resize = () => {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        renderer.setSize(rect.width, rect.height, false);
+        camera.aspect = rect.width / rect.height;
+        camera.updateProjectionMatrix();
+      };
+      const down = (event) => { dragging = true; prev = { x: event.clientX, y: event.clientY }; clickStart = prev; };
+      const up = (event) => {
+        dragging = false;
+        if (Math.abs(event.clientX - clickStart.x) > 5 || Math.abs(event.clientY - clickStart.y) > 5) return;
+        const rect = canvas.getBoundingClientRect();
+        pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const hit = raycaster.intersectObjects(interactables)[0];
+        if (!hit) return;
+        if (hit.object.userData.type === "theme") openThemeModal(hit.object.userData.era);
+        if (hit.object.userData.type === "artifact") openArtifactModal(state.artifacts.find((artifact) => artifact.id === hit.object.userData.id));
+      };
+      const move = (event) => {
+        if (!dragging) return;
+        const dx = event.clientX - prev.x;
+        const dy = event.clientY - prev.y;
+        camera.rotation.y -= dx * .004;
+        camera.rotation.x -= dy * .004;
+        camera.rotation.x = Math.max(-1.25, Math.min(1.25, camera.rotation.x));
+        prev = { x: event.clientX, y: event.clientY };
+      };
+      const wheel = (event) => {
+        camera.fov = Math.max(28, Math.min(90, camera.fov + event.deltaY * .03));
+        camera.updateProjectionMatrix();
+      };
+      const keydown = (event) => { keys[event.key.toLowerCase()] = true; };
+      const keyup = (event) => { keys[event.key.toLowerCase()] = false; };
+      canvas.addEventListener("mousedown", down);
+      window.addEventListener("mouseup", up);
+      window.addEventListener("mousemove", move);
+      canvas.addEventListener("wheel", wheel, { passive: true });
+      window.addEventListener("keydown", keydown);
+      window.addEventListener("keyup", keyup);
+      window.addEventListener("resize", resize);
+      let frameId = 0;
+      const loop = () => {
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        direction.y = 0;
+        direction.normalize();
+        const right = new THREE.Vector3().crossVectors(camera.up, direction).normalize();
+        const speed = .38;
+        if (keys.w) camera.position.addScaledVector(direction, speed);
+        if (keys.s) camera.position.addScaledVector(direction, -speed);
+        if (keys.a) camera.position.addScaledVector(right, speed);
+        if (keys.d) camera.position.addScaledVector(right, -speed);
+        const distance = Math.hypot(camera.position.x, camera.position.z);
+        const maxDistance = roomRadius - 6;
+        if (distance > maxDistance) {
+          const scale = maxDistance / distance;
+          camera.position.x *= scale;
+          camera.position.z *= scale;
+        }
+        camera.position.y = 5;
+        renderer.render(scene, camera);
+        frameId = requestAnimationFrame(loop);
+      };
+      resize();
+      loop();
+      return {
+        dispose() {
+          cancelAnimationFrame(frameId);
+          canvas.removeEventListener("mousedown", down);
+          window.removeEventListener("mouseup", up);
+          window.removeEventListener("mousemove", move);
+          canvas.removeEventListener("wheel", wheel);
+          window.removeEventListener("keydown", keydown);
+          window.removeEventListener("keyup", keyup);
+          window.removeEventListener("resize", resize);
+          renderer.dispose();
+        }
+      };
+    }
+
+    function makeTextPanel(title, subtitle, hint) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 420;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "#3730a3";
+      ctx.lineWidth = 14;
+      ctx.strokeRect(14, 14, canvas.width - 28, canvas.height - 28);
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 74px Malgun Gothic, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(title, 512, 145);
+      ctx.fillStyle = "#4338ca";
+      ctx.font = "bold 58px Malgun Gothic, sans-serif";
+      ctx.fillText(subtitle.slice(0, 13), 512, 245);
+      ctx.fillStyle = "#64748b";
+      ctx.font = "32px Malgun Gothic, sans-serif";
+      ctx.fillText(hint, 512, 330);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.generateMipmaps = false;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      return new THREE.Mesh(new THREE.PlaneGeometry(11, 4.5), new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }));
+    }
+
+    function makeArtifactPanel(artifact) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 700;
+      canvas.height = 900;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(0, 0, 700, 900);
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(24, 24, 652, 652);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 46px Malgun Gothic, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(artifact.artifactName.slice(0, 15), 350, 750);
+      ctx.fillStyle = "#4f46e5";
+      ctx.font = "30px Malgun Gothic, sans-serif";
+      ctx.fillText(`조사자: ${artifact.studentName}`, 350, 805);
+      const texture = new THREE.CanvasTexture(canvas);
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 7), new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }));
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.generateMipmaps = false;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      if (artifact.image) {
+        const img = new Image();
+        img.onload = () => {
+          const ratio = Math.min(610 / img.width, 610 / img.height);
+          const w = img.width * ratio;
+          const h = img.height * ratio;
+          ctx.drawImage(img, 350 - w / 2, 350 - h / 2, w, h);
+          mesh.material.map.needsUpdate = true;
+        };
+        img.src = artifact.image;
+      } else {
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "bold 50px Malgun Gothic, sans-serif";
+        ctx.fillText("이미지 없음", 350, 360);
+      }
+      return mesh;
+    }
+
+    function openThemeModal(era) {
+      const theme = state.themes[era];
+      openModal(`
+        <div class="modal" style="padding:38px;text-align:center;">
+          <button class="close" data-close>×</button>
+          <p class="theme-line">${era}</p>
+          <h2 style="font-size:34px;margin:8px 0 24px;">"${escapeHtml(theme.theme || "테마 미정")}"</h2>
+          <div class="description" style="text-align:left;font-size:18px;">
+            <b style="display:block;margin-bottom:10px;color:#1e1b8f;">테마 선정 이유</b>
+            ${escapeHtml(theme.reason || "아직 선정 이유가 입력되지 않았습니다.")}
+          </div>
+        </div>
+      `);
+    }
+
+    function openArtifactModal(artifact) {
+      if (!artifact) return;
+      openModal(`
+        <div class="modal">
+          <button class="close" data-close>×</button>
+          <div class="artifact-modal">
+            <div class="modal-media">${artifact.image ? `<img src="${artifact.image}" alt="${escapeHtml(artifact.artifactName)}">` : `<div style="color:white;">이미지가 등록되지 않았습니다.</div>`}</div>
+            <div class="modal-body">
+              <h2>${escapeHtml(artifact.artifactName)}</h2>
+              <p class="theme-line">조사자: ${escapeHtml(artifact.studentName)} · ${escapeHtml(artifact.era)}</p>
+              <div class="description">${escapeHtml(artifact.description)}</div>
+              ${artifact.quizQuestion ? `
+                <div class="quiz-panel">
+                  <b>관람객 O/X 퀴즈</b>
+                  <p>Q. ${escapeHtml(artifact.quizQuestion)}</p>
+                  <div class="quiz-actions">
+                    <button style="background:#2563eb;" data-quiz="O" data-answer="${artifact.quizAnswer}">O</button>
+                    <button style="background:#dc2626;" data-quiz="X" data-answer="${artifact.quizAnswer}">X</button>
+                  </div>
+                  <p id="quizResult" style="font-weight:900;"></p>
+                </div>` : ""}
+            </div>
+          </div>
+        </div>
+      `);
+    }
+
+    function openModal(html) {
+      const backdrop = document.getElementById("modalBackdrop");
+      backdrop.innerHTML = html;
+      backdrop.classList.add("show");
+      backdrop.querySelectorAll("[data-close]").forEach((button) => button.addEventListener("click", closeModal));
+      backdrop.querySelectorAll("[data-quiz]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const result = document.getElementById("quizResult");
+          result.textContent = button.dataset.quiz === button.dataset.answer ? "정답입니다. 아주 잘 맞췄어요!" : "아쉬워요. 설명을 다시 읽고 도전해보세요.";
+          result.style.color = button.dataset.quiz === button.dataset.answer ? "#166534" : "#991b1b";
+        });
+      });
+    }
+    function closeModal() {
+      const backdrop = document.getElementById("modalBackdrop");
+      backdrop.classList.remove("show");
+      backdrop.innerHTML = "";
+    }
+    document.getElementById("modalBackdrop").addEventListener("click", (event) => {
+      if (event.target.id === "modalBackdrop") closeModal();
+    });
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+    function option(value, label, selected) {
+      return `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`;
+    }
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      }[char]));
+    }
+
+    render();
+    initFirebase();
+  </script>
+</body>
+</html>
