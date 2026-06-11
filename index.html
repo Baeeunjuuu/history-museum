@@ -212,8 +212,8 @@
         return;
       }
       try {
-        const appMod = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-        const fsMod = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const appMod = await import("https://cdn.jsdelivr.net/npm/firebase@10.12.2/app/+esm");
+        const fsMod = await import("https://cdn.jsdelivr.net/npm/firebase@10.12.2/firestore/+esm");
         const app = appMod.initializeApp(FIREBASE_CONFIG);
         db = fsMod.getFirestore(app);
         sharedDocRef = fsMod.doc(db, ...FIRESTORE_PATH);
