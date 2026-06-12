@@ -160,14 +160,14 @@
 
   <script type="module">
     // Firebase 콘솔 > 프로젝트 설정 > 내 앱 > SDK 설정 및 구성의 firebaseConfig 값을 붙여 넣으세요.
-    const FIREBASE_CONFIG =   {
-  apiKey: "AIzaSyDCrpeyIUyqfaYtAwTW1zUgXhoKl1rbyZo",
-  authDomain: "sssss-68aa2.firebaseapp.com",
-  projectId: "sssss-68aa2",
-  storageBucket: "sssss-68aa2.firebasestorage.app",
-  messagingSenderId: "850830594207",
-  appId: "1:850830594207:web:6945e514aa46357b6a52aa"
-};
+    const FIREBASE_CONFIG = {
+      apiKey: "여기에_apiKey",
+      authDomain: "여기에_authDomain",
+      projectId: "여기에_projectId",
+      storageBucket: "여기에_storageBucket",
+      messagingSenderId: "여기에_messagingSenderId",
+      appId: "여기에_appId"
+    };
 
     const ERAS = ["삼국시대 1", "삼국시대 2", "고려시대 1", "고려시대 2", "조선시대 1"];
     const DEFAULT_COLORS = ["#ffecd2", "#d4fc79", "#e0c3fc", "#dbeafe", "#fdfbfb"];
@@ -212,8 +212,16 @@
         return;
       }
       try {
-        const appMod = await import("https://cdn.jsdelivr.net/npm/firebase@10.12.2/app/+esm");
-        const fsMod = await import("https://cdn.jsdelivr.net/npm/firebase@10.12.2/firestore/+esm");
+        const appMod = await importFirstWorking([
+          "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
+          "https://cdn.jsdelivr.net/npm/firebase@10.12.2/app/+esm",
+          "https://esm.sh/firebase@10.12.2/app"
+        ]);
+        const fsMod = await importFirstWorking([
+          "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js",
+          "https://cdn.jsdelivr.net/npm/firebase@10.12.2/firestore/+esm",
+          "https://esm.sh/firebase@10.12.2/firestore"
+        ]);
         const app = appMod.initializeApp(FIREBASE_CONFIG);
         db = fsMod.getFirestore(app);
         sharedDocRef = fsMod.doc(db, ...FIRESTORE_PATH);
@@ -237,9 +245,22 @@
         });
       } catch (error) {
         console.error(error);
-        notice.textContent = "Firebase SDK를 불러오지 못했습니다. 인터넷 연결 또는 설정값을 확인하세요.";
+        notice.textContent = "Firebase SDK를 불러오지 못했습니다. 학교망/브라우저가 Firebase CDN을 차단했을 수 있습니다. 다른 인터넷 또는 브라우저에서 확인하세요.";
         notice.classList.add("show");
       }
+    }
+
+    async function importFirstWorking(urls) {
+      const errors = [];
+      for (const url of urls) {
+        try {
+          return await import(url);
+        } catch (error) {
+          errors.push(`${url}: ${error.message}`);
+        }
+      }
+      console.error("Firebase SDK import failed", errors);
+      throw new Error("모든 Firebase SDK 주소를 불러오지 못했습니다.");
     }
 
     function loadLocalState() {
