@@ -104,6 +104,15 @@
     .quiz-panel { margin-top: 18px; background: #e0e7ff; border: 1px solid #c7d2fe; border-radius: 6px; padding: 16px; }
     .quiz-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
     .quiz-actions button { color: white; font-size: 24px; font-weight: 900; padding: 10px; border-radius: 6px; }
+    .comment-panel { margin-top: 18px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; }
+    .comment-panel h3 { margin: 0 0 12px; font-size: 17px; color: #1e1b8f; }
+    .comment-form { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; align-items: start; }
+    .comment-form input, .comment-form textarea { margin: 0; }
+    .comment-form textarea { min-height: 42px; }
+    .comment-form button { background: #4f46e5; color: white; border-radius: 4px; padding: 10px 14px; font-weight: 900; white-space: nowrap; }
+    .comment-list { margin-top: 14px; display: grid; gap: 8px; max-height: 180px; overflow: auto; }
+    .comment-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; }
+    .comment-meta { display: flex; justify-content: space-between; gap: 10px; color: #64748b; font-size: 12px; font-weight: 800; margin-bottom: 5px; }
     .funding-layout { display: grid; grid-template-columns: 1fr 255px; gap: 24px; align-items: start; }
     .funding-title { margin: 0 0 16px; font-size: 27px; display: flex; gap: 10px; align-items: center; }
     .fund-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
@@ -182,6 +191,7 @@
       }])),
       artifacts: [],
       fundings: [],
+      comments: [],
       teacherPassword: ""
     };
 
@@ -277,6 +287,7 @@
         themes: { ...structuredClone(DEFAULT_STATE).themes, ...(data.themes || {}) },
         artifacts: Array.isArray(data.artifacts) ? data.artifacts : [],
         fundings: Array.isArray(data.fundings) ? data.fundings : [],
+        comments: Array.isArray(data.comments) ? data.comments : [],
         teacherPassword: data.teacherPassword || ""
       };
     }
@@ -975,6 +986,17 @@
                   </div>
                   <p id="quizResult" style="font-weight:900;"></p>
                 </div>` : ""}
+              <div class="comment-panel">
+                <h3>댓글 / 감상 나누기</h3>
+                <form class="comment-form" data-comment-form="${artifact.id}">
+                  <input name="commentName" placeholder="이름" maxlength="20" required>
+                  <textarea name="commentText" placeholder="작품을 보고 든 생각이나 친구에게 전하고 싶은 의견을 적어보세요." maxlength="180" required></textarea>
+                  <button type="submit">등록</button>
+                </form>
+                <div class="comment-list">
+                  ${renderArtifactComments(artifact.id)}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -993,11 +1015,49 @@
           result.style.color = button.dataset.quiz === button.dataset.answer ? "#166534" : "#991b1b";
         });
       });
+      backdrop.querySelectorAll("[data-comment-form]").forEach((form) => {
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const data = new FormData(form);
+          const artifactId = form.dataset.commentForm;
+          const name = String(data.get("commentName") || "").trim();
+          const text = String(data.get("commentText") || "").trim();
+          if (!name || !text) return;
+          state.comments.push({
+            id: crypto.randomUUID(),
+            artifactId,
+            name: name.slice(0, 20),
+            text: text.slice(0, 180),
+            timestamp: Date.now()
+          });
+          await saveState();
+          const artifact = state.artifacts.find((item) => item.id === artifactId);
+          if (artifact) openArtifactModal(artifact);
+          showToast("댓글이 등록되었습니다.");
+        });
+      });
     }
     function closeModal() {
       const backdrop = document.getElementById("modalBackdrop");
       backdrop.classList.remove("show");
       backdrop.innerHTML = "";
+    }
+    function renderArtifactComments(artifactId) {
+      const comments = state.comments
+        .filter((comment) => comment.artifactId === artifactId)
+        .sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
+      if (!comments.length) {
+        return `<p class="empty" style="margin-left:0;">아직 댓글이 없습니다. 첫 감상을 남겨보세요.</p>`;
+      }
+      return comments.map((comment) => `
+        <div class="comment-item">
+          <div class="comment-meta">
+            <span>${escapeHtml(comment.name || "익명")}</span>
+            <span>${formatDate(comment.timestamp)}</span>
+          </div>
+          <div>${escapeHtml(comment.text || "")}</div>
+        </div>
+      `).join("");
     }
     document.getElementById("modalBackdrop").addEventListener("click", (event) => {
       if (event.target.id === "modalBackdrop") closeModal();
