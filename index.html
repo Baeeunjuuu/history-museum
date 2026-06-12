@@ -78,7 +78,7 @@
     .artifact-row img { width: 54px; height: 54px; object-fit: cover; border-radius: 4px; background: #e2e8f0; }
     .theme-line { color: #4f46e5; font-weight: 800; font-size: 14px; }
     .museum-view { width: 100%; margin: 0; height: calc(100vh - 48px); position: relative; overflow: hidden; background: #050816; }
-    #museumCanvas { display: block; width: 100%; height: 100%; }
+    #museumCanvas { display: block; width: 100%; height: 100%; touch-action: none; }
     .hud {
       position: absolute; left: 50%; transform: translateX(-50%); background: rgba(2, 6, 23, .72);
       color: white; backdrop-filter: blur(10px); border-radius: 999px; padding: 10px 16px;
@@ -144,7 +144,7 @@
         <button data-tab="manage">🔐 유물 관리</button>
       </nav>
     </header>
-    <div id="firebaseNotice" class="notice"></div>
+    <div id="firebaseNotice" class="notice show">Firebase 연결 상태를 확인하는 중입니다...</div>
     <main id="setupView" class="view"></main>
     <main id="registerView" class="view" hidden></main>
     <main id="museumView" class="museum-view" hidden>
@@ -160,7 +160,7 @@
 
   <script type="module">
     // Firebase 콘솔 > 프로젝트 설정 > 내 앱 > SDK 설정 및 구성의 firebaseConfig 값을 붙여 넣으세요.
-    const firebaseConfig = {
+    const FIREBASE_CONFIG = {
       apiKey: "AIzaSyDCrpeyIUyqfaYtAwTW1zUgXhoKl1rbyZo",
       authDomain: "sssss-68aa2.firebaseapp.com",
       databaseURL: "https://sssss-68aa2-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -169,6 +169,7 @@
       messagingSenderId: "850830594207",
       appId: "1:850830594207:web:6945e514aa46357b6a52aa"
     };
+
     const ERAS = ["삼국시대 1", "삼국시대 2", "고려시대 1", "고려시대 2", "조선시대 1"];
     const DEFAULT_COLORS = ["#ffecd2", "#d4fc79", "#e0c3fc", "#dbeafe", "#fdfbfb"];
     const DEFAULT_FLOORS = ["#333333", "#444444", "#555555", "#475569", "#666666"];
@@ -736,13 +737,39 @@
         camera.aspect = rect.width / rect.height;
         camera.updateProjectionMatrix();
       };
-      const down = (event) => { dragging = true; prev = { x: event.clientX, y: event.clientY }; clickStart = prev; };
+      const getPoint = (event) => {
+        const touch = event.touches?.[0] || event.changedTouches?.[0];
+        return touch ? { x: touch.clientX, y: touch.clientY } : { x: event.clientX, y: event.clientY };
+      };
+      const getTouchDistance = (event) => {
+        if (!event.touches || event.touches.length < 2) return 0;
+        const [a, b] = event.touches;
+        return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      };
+      let pinchStartDistance = 0;
+      let pinchStartFov = camera.fov;
+      const down = (event) => {
+        event.preventDefault?.();
+        if (event.touches?.length === 2) {
+          dragging = false;
+          pinchStartDistance = getTouchDistance(event);
+          pinchStartFov = camera.fov;
+          return;
+        }
+        const point = getPoint(event);
+        dragging = true;
+        prev = point;
+        clickStart = point;
+      };
       const up = (event) => {
+        event.preventDefault?.();
         dragging = false;
-        if (Math.abs(event.clientX - clickStart.x) > 5 || Math.abs(event.clientY - clickStart.y) > 5) return;
+        if (event.touches?.length) return;
+        const point = getPoint(event);
+        if (Math.abs(point.x - clickStart.x) > 8 || Math.abs(point.y - clickStart.y) > 8) return;
         const rect = canvas.getBoundingClientRect();
-        pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        pointer.x = ((point.x - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((point.y - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(pointer, camera);
         const hit = raycaster.intersectObjects(interactables)[0];
         if (!hit) return;
@@ -750,13 +777,23 @@
         if (hit.object.userData.type === "artifact") openArtifactModal(state.artifacts.find((artifact) => artifact.id === hit.object.userData.id));
       };
       const move = (event) => {
+        event.preventDefault?.();
+        if (event.touches?.length === 2) {
+          const currentDistance = getTouchDistance(event);
+          if (pinchStartDistance > 0 && currentDistance > 0) {
+            camera.fov = Math.max(28, Math.min(90, pinchStartFov * (pinchStartDistance / currentDistance)));
+            camera.updateProjectionMatrix();
+          }
+          return;
+        }
         if (!dragging) return;
-        const dx = event.clientX - prev.x;
-        const dy = event.clientY - prev.y;
+        const point = getPoint(event);
+        const dx = point.x - prev.x;
+        const dy = point.y - prev.y;
         camera.rotation.y -= dx * .004;
         camera.rotation.x -= dy * .004;
         camera.rotation.x = Math.max(-1.25, Math.min(1.25, camera.rotation.x));
-        prev = { x: event.clientX, y: event.clientY };
+        prev = point;
       };
       const wheel = (event) => {
         camera.fov = Math.max(28, Math.min(90, camera.fov + event.deltaY * .03));
@@ -767,6 +804,10 @@
       canvas.addEventListener("mousedown", down);
       window.addEventListener("mouseup", up);
       window.addEventListener("mousemove", move);
+      canvas.addEventListener("touchstart", down, { passive: false });
+      canvas.addEventListener("touchend", up, { passive: false });
+      canvas.addEventListener("touchcancel", up, { passive: false });
+      canvas.addEventListener("touchmove", move, { passive: false });
       canvas.addEventListener("wheel", wheel, { passive: true });
       window.addEventListener("keydown", keydown);
       window.addEventListener("keyup", keyup);
@@ -802,6 +843,10 @@
           canvas.removeEventListener("mousedown", down);
           window.removeEventListener("mouseup", up);
           window.removeEventListener("mousemove", move);
+          canvas.removeEventListener("touchstart", down);
+          canvas.removeEventListener("touchend", up);
+          canvas.removeEventListener("touchcancel", up);
+          canvas.removeEventListener("touchmove", move);
           canvas.removeEventListener("wheel", wheel);
           window.removeEventListener("keydown", keydown);
           window.removeEventListener("keyup", keyup);
