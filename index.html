@@ -195,7 +195,7 @@
     let teacherLoggedIn = false;
     let state = loadLocalState();
 
-    function hasFirebaseConfig() {
+    function hasFirebaseConfigSdkDeprecated() {
       return FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.includes("여기에");
     }
 
@@ -205,7 +205,7 @@
       return THREE;
     }
 
-    async function initFirebase() {
+    async function initFirebaseSdkDeprecated() {
       const notice = document.getElementById("firebaseNotice");
       if (!hasFirebaseConfig()) {
         notice.textContent = "현재 Firebase 설정값이 없어 이 브라우저에만 저장됩니다. 학생 공동 사용 전 firebaseConfig를 입력하세요.";
@@ -285,7 +285,7 @@
       localStorage.setItem("historyMuseumFundingApp", JSON.stringify(state));
     }
 
-    async function saveState() {
+    async function saveStateSdkDeprecated() {
       saveLocalState();
       if (firebaseReady && sharedDocRef) {
         await firebaseApi.setDoc(sharedDocRef, {
@@ -1002,6 +1002,79 @@
       return String(value ?? "").replace(/[&<>"']/g, (char) => ({
         "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
       }[char]));
+    }
+
+    let restPollTimer = null;
+    let lastRemotePayload = "";
+
+    function hasFirebaseConfig() {
+      return FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.includes("여기에");
+    }
+
+    function firestoreRestUrl() {
+      return `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents/${FIRESTORE_PATH.join("/")}?key=${FIREBASE_CONFIG.apiKey}`;
+    }
+
+    async function initFirebase() {
+      const notice = document.getElementById("firebaseNotice");
+      if (!hasFirebaseConfig()) {
+        notice.textContent = "현재 Firebase 설정값이 없어 이 브라우저에만 저장됩니다. 학생 공동 사용 전 firebaseConfig를 입력하세요.";
+        notice.classList.add("show");
+        return;
+      }
+      firebaseReady = true;
+      notice.textContent = "Firebase 공동 저장소에 연결을 시도하는 중입니다...";
+      notice.classList.add("show");
+      try {
+        await loadRemoteState();
+        clearInterval(restPollTimer);
+        restPollTimer = setInterval(() => loadRemoteState(true), 3500);
+        notice.textContent = "Firebase 공동 저장소에 연결되었습니다.";
+      } catch (error) {
+        console.error(error);
+        notice.textContent = "Firebase 공동 저장소 연결에 실패했습니다. Firestore 생성 여부와 규칙을 확인하세요.";
+      }
+    }
+
+    async function loadRemoteState(silent = false) {
+      const response = await fetch(firestoreRestUrl(), { cache: "no-store" });
+      if (response.status === 404) {
+        await saveState();
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`Firestore read failed: ${response.status}`);
+      }
+      const doc = await response.json();
+      const payload = doc.fields?.payload?.stringValue;
+      if (!payload || payload === lastRemotePayload) return;
+      lastRemotePayload = payload;
+      state = mergeState(JSON.parse(payload));
+      saveLocalState();
+      if (!silent || currentTab !== "museum") render();
+    }
+
+    async function saveState() {
+      saveLocalState();
+      if (!firebaseReady) return;
+      const payload = JSON.stringify(state);
+      lastRemotePayload = payload;
+      const response = await fetch(firestoreRestUrl(), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fields: {
+            payload: { stringValue: payload },
+            updatedAt: { integerValue: String(Date.now()) }
+          }
+        })
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Firestore save failed", response.status, text);
+        document.getElementById("firebaseNotice").textContent = "Firebase 저장에 실패했습니다. Firestore 규칙을 확인하세요.";
+        throw new Error(`Firestore save failed: ${response.status}`);
+      }
     }
 
     render();
