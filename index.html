@@ -91,10 +91,14 @@
     .modal-backdrop {
       position: fixed; inset: 48px 0 0; background: rgba(2, 6, 23, .78); z-index: 40;
       display: none; align-items: flex-start; justify-content: center; padding: 22px;
-      overflow-y: auto; -webkit-overflow-scrolling: touch;
+      overflow: hidden;
     }
     .modal-backdrop.show { display: flex; }
-    .modal { width: min(940px, 96vw); max-height: none; background: white; border-radius: 8px; overflow: visible; box-shadow: 0 25px 80px rgba(0,0,0,.32); position: relative; margin: 0 auto 28px; }
+    .modal {
+      width: min(940px, 96vw); max-height: calc(100vh - 96px); background: white; border-radius: 8px;
+      overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+      box-shadow: 0 25px 80px rgba(0,0,0,.32); position: relative; margin: 0 auto 28px;
+    }
     .close { position: absolute; right: 12px; top: 12px; width: 36px; height: 36px; border-radius: 999px; background: rgba(15,23,42,.72); color: white; z-index: 2; font-size: 22px; }
     .artifact-modal { display: grid; grid-template-columns: 1fr 1fr; min-height: 520px; }
     .modal-media { background: #111827; display: flex; align-items: center; justify-content: center; padding: 28px; }
@@ -140,7 +144,14 @@
       .museum-view { height: calc(100vh - 95px); }
       .hud { width: calc(100vw - 26px); justify-content: center; flex-wrap: wrap; border-radius: 8px; gap: 8px 14px; white-space: normal; }
       .modal-backdrop { inset: 0; padding: 10px; align-items: flex-start; }
-      .modal { width: min(94vw, 720px); margin: 10px auto 24px; border-radius: 8px; }
+      .modal {
+        width: min(94vw, 720px);
+        max-height: calc(100dvh - 20px);
+        margin: 10px auto 24px;
+        border-radius: 8px;
+        overflow-y: auto;
+      }
+      .artifact-modal { display: block; min-height: 0; }
       .modal-media { min-height: auto; padding: 18px; }
       .modal-media img { max-height: none; width: 100%; height: auto; }
       .modal-body { padding: 22px 18px 28px; }
